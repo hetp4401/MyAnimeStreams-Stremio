@@ -1,0 +1,24 @@
+{
+    "id": "com.stremio.a4u.addon",
+    "version": "0.0.1",
+    "name": "a4u",
+    "description": "Watch your favourite animes!",
+    "catalogs": [],
+    "resources": [
+        {
+            "name": "stream",
+            "types": [
+                "movie",
+                "series"
+            ],
+            "idPrefixes": [
+                "kitsu"
+            ]
+        }
+    ],
+    "types": [
+        "movie",
+        "series",
+        "other"
+    ]
+}
