@@ -5,11 +5,17 @@ var addon = express();
 
 var MANIFEST = require("./manifest.json");
 
+var NodeCache = require("node-cache");
+var cache = new NodeCache();
+
 var KI_PRE = process.env.KI_PRE;
 var KI_SUF = process.env.KI_SUF;
 var SE_PRE = process.env.SE_PRE;
 var TU_PRE = process.env.TU_PRE;
 var TU_SUF = process.env.TU_SUF;
+
+const MAX_AGE = 60 * 60 * 24 * 7;
+const LINK_TTL = 60 * 30;
 
 var search = (query) => {
   return new Promise((resolve, reject) => {
@@ -19,17 +25,22 @@ var search = (query) => {
         var idx = x.indexOf("\\");
         return x.substring(0, idx);
       });
-      resolve(search[0]);
+
+      var arr = [search[0]];
+      if (search.includes(search[0] + "-dub")) {
+        arr.push(search[0] + "-dub");
+      }
+      resolve(arr);
     });
   });
 };
 
-var k_title = (id) => {
+var ki_title = (id) => {
   return new Promise((resolve, reject) => {
     request(KI_PRE + id + KI_SUF, (e, r, b) => {
       var json = JSON.parse(b);
       var name = json.meta.name;
-      var title = name.replace(/[^a-z0-9 ]/gi, "");
+      var title = name.replace(/[^a-z0-9 ]/gi, " ");
       resolve(title);
     });
   });
@@ -37,9 +48,9 @@ var k_title = (id) => {
 
 var get_title = async (id) => {
   return new Promise(async (resolve, reject) => {
-    var s_title = await k_title(id);
-    var title = await search(s_title);
-    resolve(title);
+    var s_title = await ki_title(id);
+    var p = await search(s_title);
+    resolve(p);
   });
 };
 
@@ -65,8 +76,9 @@ var source = (tunnel) => {
   });
 };
 
-var stream = async (title, ep) => {
+var stream = async (title, e) => {
   return new Promise(async (resolve, reject) => {
+    var ep = e ? e : 1;
     var t = await tunnel(title, ep);
     var s = await source(t);
     resolve(s);
@@ -84,40 +96,38 @@ addon.get("/manifest.json", (req, res) => {
   respond(res, MANIFEST);
 });
 
-var cache = {};
-
 addon.get("/stream/:type/:media.json", async (req, res, next) => {
   var media = req.params.media;
-  var arr = media.split(":").slice(1);
-  var id = arr[0];
-  var ep = arr[1];
+  var arr = media.split(":");
+  var id = arr[1];
+  var ep = arr[2];
 
-  if (!(id in cache)) {
-    var t = await get_title(id);
-    cache[id] = {
-      title: t,
-      episodes: {},
-    };
+  if (!cache.get(media)) {
+    if (!cache.get(id)) {
+      cache.set(id, await get_title(id), MAX_AGE);
+    }
+    var t = cache.get(id);
+
+    cache.set(
+      media,
+
+      await Promise.all(
+        t.map(async (x) => {
+          return {
+            name: "A4U",
+            title: x.replace(/[^a-z0-9 ]/gi, " "),
+            url: await stream(x, ep),
+          };
+        })
+      ),
+      LINK_TTL
+    );
   }
 
-  var { title, episodes } = cache[id];
+  var e = cache.get(media);
 
-  if (!(ep in episodes)) {
-    var e = await stream(title, ep);
-    episodes[ep] = e;
-  }
-
-  var link = await episodes[ep];
-
-  console.log(cache);
   respond(res, {
-    streams: [
-      {
-        name: "A4U",
-        title: title + " - " + ep,
-        url: link,
-      },
-    ],
+    streams: e,
   });
 });
 
