@@ -5,6 +5,8 @@ const addon = express();
 const NodeCache = require("node-cache");
 const cache = new NodeCache();
 
+const { get, put } = require("./lib/db");
+
 require("dotenv").config();
 const KI_PRE = process.env.KI_PRE;
 const KI_SUF = process.env.KI_SUF;
@@ -13,12 +15,13 @@ const TU_PRE = process.env.TU_PRE;
 const TU_SUF = process.env.TU_SUF;
 const HOST = process.env.HOST;
 const SERVER = process.env.SERVER;
+
 const MAX_AGE = 60 * 60 * 24 * 7;
 const LINK_TTL = 60 * 30;
 const MANIFEST = require("./manifest.json");
-const EPISODE = "Episode ";
-const DUB = " Dub";
-const SUB = " Sub";
+const EPISODE = "Ep";
+const DUB = "dub";
+const SUB = "sub";
 
 const search = (query) => {
   return new Promise((resolve, reject) => {
@@ -33,6 +36,7 @@ const search = (query) => {
       if (search.includes(search[0] + "-dub")) {
         arr.push(search[0] + "-dub");
       }
+      console.log(arr);
       resolve(arr);
     });
   });
@@ -43,7 +47,8 @@ const ki_title = (id) => {
     request(KI_PRE + id + KI_SUF, (e, r, b) => {
       const json = JSON.parse(b);
       const name = json.meta.name;
-      const title = name.replace(/[^a-z0-9 ]/gi, " ");
+      const title = name.replace(/[^a-z0-9 ]/gi, "");
+      console.log(title);
       resolve(title);
     });
   });
@@ -60,10 +65,14 @@ const get_title = async (id) => {
 const tunnel = (title, ep) => {
   return new Promise((resolve, reject) => {
     request(TU_PRE + title + TU_SUF + ep, (e, r, b) => {
-      const json = JSON.parse(b);
-      const source = json.openload;
-      const link = source.replace(HOST, SERVER);
-      resolve(link);
+      if (r.statusCode == 200) {
+        const json = JSON.parse(b);
+        const source = json.openload;
+        const link = source.replace(HOST, SERVER);
+        resolve(link);
+      } else {
+        resolve(null);
+      }
     });
   });
 };
@@ -73,7 +82,6 @@ const source = (tunnel) => {
     request(tunnel, (e, r, b) => {
       const json = JSON.parse(b);
       const stream = json.source[0].file;
-      console.log(stream);
       resolve(stream);
     });
   });
@@ -83,9 +91,22 @@ const stream = async (title, e) => {
   return new Promise(async (resolve, reject) => {
     const ep = e ? e : 1;
     const t = await tunnel(title, ep);
-    const s = await source(t);
-    resolve(s);
+    if (t == null) {
+      resolve(null);
+    } else {
+      const s = await source(t);
+      resolve(s);
+    }
   });
+};
+
+const check = (streams) => {
+  streams.forEach((x) => {
+    if (x.url == null) {
+      return false;
+    }
+  });
+  return true;
 };
 
 const respond = (res, data) => {
@@ -107,25 +128,27 @@ addon.get("/stream/:type/:media.json", async (req, res, next) => {
 
   if (!cache.get(media)) {
     if (!cache.get(id)) {
-      cache.set(id, await get_title(id), MAX_AGE);
+      if ((await get(id)) == null) {
+        const ts = await get_title(id);
+        const p_res = await put(id, ts);
+      }
+      const res = await get(id);
+      cache.set(id, res.title, MAX_AGE);
     }
 
     const t = cache.get(id);
 
-    cache.set(
-      media,
-      await Promise.all(
-        t.map(async (x) => {
-          return {
-            name: "A4U",
-            title: EPISODE + ep + (x.includes("dub") ? DUB : SUB),
-
-            url: await stream(x, ep),
-          };
-        })
-      ),
-      LINK_TTL
+    const links = await Promise.all(
+      t.map(async (x) => {
+        return {
+          name: "A4U",
+          title: `${EPISODE} ${ep} ${x.includes("dub") ? DUB : SUB}`,
+          url: await stream(x, ep),
+        };
+      })
     );
+
+    cache.set(media, check(links) ? links : [], LINK_TTL);
   }
 
   const e = cache.get(media);
