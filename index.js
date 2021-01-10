@@ -5,12 +5,12 @@ const { get_stream } = require("./lib/functions");
 
 const MANIFEST = require("./manifest.json");
 
-const respond = (res, data) => {
+function respond(res, data) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "*");
   res.setHeader("Content-Type", "application/json");
   res.send(data);
-};
+}
 
 addon.get("/manifest.json", (req, res) => {
   respond(res, MANIFEST);
