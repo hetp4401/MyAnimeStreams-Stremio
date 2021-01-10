@@ -1,8 +1,8 @@
 {
-    "id": "com.stremio.a4u.addon",
+    "id": "com.stremio.MyAnimeStreams.addon",
     "version": "0.0.1",
-    "name": "a4u",
-    "description": "Watch your favourite animes!",
+    "name": "MyAnimeStreams+",
+    "description": "Provides http streams of your all your favourite animes! Please INSTALL the ANIME KITSU add-on for this to work.",
     "catalogs": [],
     "resources": [
         {
@@ -20,5 +20,9 @@
         "movie",
         "series",
         "other"
-    ]
+    ],
+    "behaviorHints": {
+        "configurable": false,
+        "configurationRequired": false
+    }
 }
