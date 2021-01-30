@@ -1,7 +1,9 @@
 const express = require("express");
 const addon = express();
 
-const { get_stream } = require("./lib/functions");
+const { get_stream } = require("./lib/providers/4anime");
+const { get_stream2 } = require("./lib/providers/gogo");
+const { get_stream3 } = require("./lib/providers/kisa");
 
 const MANIFEST = require("./manifest.json");
 
@@ -25,15 +27,33 @@ addon.param("type", (req, res, next, val) => {
 });
 
 addon.get("/stream/:type/:media.json", async (req, res, next) => {
-  const media = req.params.media;
+  const { media, type } = req.params;
   const arr = media.split(":");
   const id = arr[1];
-  const ep = arr[2];
+  const ep = arr[2] ? arr[2] : 1;
 
-  const e = await get_stream(media, id, ep);
+  const sources = [get_stream, get_stream2, get_stream3];
+
+  const s = await Promise.all(
+    sources.map(async (x) => await x(media, id, ep, type))
+  );
+
+  const links = s.reduce((a, b) => a.concat(b));
+
+  const set = new Set();
+  const streams = [];
+
+  links.forEach((x) => {
+    if (!set.has(x.url)) {
+      set.add(x.url);
+      streams.push(x);
+    }
+  });
+
+  console.log(set);
 
   respond(res, {
-    streams: e,
+    streams: streams,
   });
 });
 
@@ -44,3 +64,5 @@ addon.get("/", (req, res) => {
 addon.listen(process.env.PORT || 7000, () => {
   console.log("Add-on Repository URL: http://127.0.0.1:7000/manifest.json");
 });
+
+const request = require("request");
