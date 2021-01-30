@@ -50,11 +50,14 @@ addon.get("/stream/:type/:media.json", async (req, res, next) => {
     }
   });
 
-  console.log(set + "\n\n\n");
-
   respond(res, {
     streams: streams,
   });
+
+  console.log("\n");
+  console.log(set);
+  console.log("\n");
+  console.log("\n");
 });
 
 addon.get("/", (req, res) => {
