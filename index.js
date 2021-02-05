@@ -65,7 +65,7 @@ addon.get("/stream/:type/:media.json", async (req, res, next) => {
 });
 
 addon.get("/check", (req, res) => {
-  res.send(unique.size);
+  res.send(unique.size + " ");
 });
 
 addon.get("/", (req, res) => {
