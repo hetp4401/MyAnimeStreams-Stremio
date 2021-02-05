@@ -27,6 +27,7 @@ addon.param("type", (req, res, next, val) => {
 });
 
 addon.get("/stream/:type/:media.json", async (req, res, next) => {
+  console.log(req.headers["x-forwarded-for"] || req.connection.remoteAddress);
   const { media, type } = req.params;
   const arr = media.split(":");
   const id = arr[1];
