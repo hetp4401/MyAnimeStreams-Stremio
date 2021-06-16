@@ -13,6 +13,7 @@ function respond(res, data) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Headers", "*");
   res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "public");
   res.send(data);
 }
 
